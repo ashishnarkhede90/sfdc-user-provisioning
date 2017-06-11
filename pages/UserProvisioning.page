@@ -1,0 +1,322 @@
+<apex:page showHeader="false" controller="UserProvisioningUtil" standardStylesheets="false" sidebar="false" applyHtmlTag="false" applyBodyTag="false" docType="html-5.0" >    
+
+<html xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">    
+
+<head>
+	<title>LMS User Provisioning</title>
+  	<apex:slds />
+  	<style>
+	  	.box {
+			height: 300px;
+			/*max-width: 250px;*/
+			/*width: auto;*/
+			width: 300px;
+			overflow: auto;
+			margin-right: 1em;
+			border: 1px solid gray;
+			display: inline-block;
+			vertical-align: top; /* Vertical-align value defaults to bottom when display:inline-block is set */
+		}
+
+		/* Prevent text content of the draggable elements from dragging*/
+		[draggable] {
+		  -moz-user-select: none;
+		  -khtml-user-select: none;
+		  -webkit-user-select: none;
+		  user-select: none;
+		  /* Required to make elements draggable in old WebKit */
+		  -khtml-user-drag: element;
+		  -webkit-user-drag: element;
+		}
+
+		div.item {
+			padding: 5px 20px 5px 20px;
+			cursor: move
+		}
+
+		div.box > div:nth-of-type(odd) {
+			 background-color: #e0e0e0;
+		}
+
+		#inputSearch, #inputSearch2 { 
+			width: inherit;
+			position: absolute;
+			text-indent: 18px;
+			padding: 5px
+		}
+
+		div.source > div:nth-of-type(1) {
+			margin-top: 30px
+		}
+
+		.sectionTitle { 
+			background-color: #16325c;
+		    text-indent: 10px;
+		    color: white;
+		    font-size: 14px;
+		    border-radius: 0
+		}
+  	</style>
+
+  	<!-- JS for drag and drop -->
+  	<apex:includeScript value="{!$Resource.Dnd}" />
+
+  	<script>
+
+  		var _dnd1, _dnd2, _self;
+  		_self = this;
+  		
+  		window.onload = function() {
+  			var boxWidth = document.getElementById('source').offsetWidth;
+			document.getElementById('inputSearch').style.width = parseInt(boxWidth) - 2  + 'px';
+			document.getElementById('inputSearch2').style.width = parseInt(boxWidth) - 2  + 'px';
+  			
+  			var sourceOptions = '{!JSENCODE(permissionSetJsonObj)}';
+
+	  		var config1 = {
+				'sourceId': 'source',
+				'targetId': 'target',
+				'searchFilterId': 'inputSearch',
+				'draggableElemClass': 'item',
+				'optionsMap': sourceOptions,
+				'validDropTargets': ['target'] 
+			};
+
+			_dnd1 = _dnd(config1);
+			_dnd1.init();	
+
+			var sourceOptions2 = '{!JSENCODE(packageLicenseJsonObj)}';
+			var config2 = {
+				'sourceId': 'source2',
+				'targetId': 'target2',
+				'searchFilterId': 'inputSearch2',
+				'draggableElemClass': 'item',
+				'optionsMap': sourceOptions2,
+				'validDropTargets': ['target2'] 
+			};
+
+			_dnd2 = _dnd(config2);
+			_dnd2.init();
+
+			// get file contents
+			document.getElementById('file-upload-input-01').onchange = function(e) {
+    			// fire the upload here
+    			console.log(this.files);
+
+    			if(this.files) {
+    				var inputFile = this.files[0];
+    				if(inputFile.type != 'text/csv') {
+    					alert('Invalid input format. Only CSV files are supported.');
+    				}
+    				else {
+    					
+    					_self.dataFile = {
+    						'filename': inputFile.name,
+    						'format': inputFile.type,
+    						'data': ''
+    					};
+
+    					var reader = new FileReader();
+		    			reader.readAsText(this.files[0]);
+
+		    			reader.onload = function(e) {
+		    				var records = e.target.result;
+		    				_self.dataFile.data = records;
+		    			}
+
+		    			reader.onerror = function(e) {
+		    				if(e.target.error.name == "NotReadableError") {
+								alert("Canno't read file !");
+								reject('Cannot read file!');
+						    }
+		    			}
+    				}// else
+    			}
+    			
+			};
+
+  		} // window.onload
+
+		// Method to send selected options to the server method
+		function processSelections() {
+			var cks = document.getElementsByClassName('flag');
+			console.log(cks);
+
+			console.log(_dnd1.selectedValuesJSON);
+			console.log(_dnd2.selectedValuesJSON);
+
+			
+			var response = {
+				'selectedPermissionSets': _dnd1.selectedValuesJSON,
+				'selectedPackageLicenses': _dnd2.selectedValuesJSON,
+				'userData': _self.dataFile
+			}
+
+			Visualforce.remoting.Manager.invokeAction(
+				'{!$RemoteAction.UserProvisioningUtil.provisionUsers}',
+				JSON.stringify(response),
+				function(result, event){
+					console.log(result);
+					console.log(event);
+					//alert('There was an error with the request. Please try again!');
+				}, { escape: false }
+			)
+
+			/*
+			var p = new Promise(function(resolve, reject) {
+				
+			});
+
+			p.then(function(data) {
+				debugger;
+				
+			});*/
+
+		}  		
+  	</script>
+  	
+</head>    
+
+<body>    
+
+  <!-- REQUIRED SLDS WRAPPER -->
+  <div class="slds-scope">    
+
+    <!-- MASTHEAD -->
+    <div class="slds-page-header">
+		<div class="slds-grid">
+			<div class="slds-col slds-has-flexi-truncate">
+			  <div class="slds-media slds-no-space slds-grow">
+			    <div class="slds-media__figure">
+			      <!-- <svg class="slds-icon slds-icon-standard-user" aria-hidden="true">
+			        <use xlink:href="/assets/icons/standard-sprite/svg/symbols.svg#user"></use>
+			      </svg> -->
+			    </div>
+			    <div class="slds-media__body">
+			      <p class="slds-text-title--caps slds-line-height--reset"></p>
+			      <h1 class="slds-page-header__title slds-m-right--small slds-align-middle slds-truncate" title="this should match the Record Title">User Provisioning Utility</h1>
+			    </div>
+			  </div>
+			</div>
+			<div class="slds-col slds-no-flex slds-grid slds-align-top">
+				<div class="slds-button-group" role="group">
+			        <a href="/setup/forcecomHomepage.apexp" class="slds-button slds-button--neutral">Setup</a>
+		        </div>
+			</div>
+		</div>
+	</div>
+    <!-- / MASTHEAD -->    
+
+    <!-- PRIMARY CONTENT WRAPPER -->
+    <div class="slds-grid slds-m-around--medium slds-grid--align-center">    
+
+	    <apex:form styleClass="slds-box slds-theme--shade slds-size--2-of-2">
+
+	    	<div class="slds-form--stacked">
+	    		<div class="slds-section slds-is-open">
+				  	<div class="slds-section__title sectionTitle">Upload user records</div>
+				  		<br />
+					  	<div aria-hidden="false" class="slds-section__content slds-m-left--medium" id="expando-unique-id">
+					  		<div class="slds-form-element">
+								<label class="slds-form-element__label" for="file-upload-input-01"></label>
+								<div class="slds-form-element__control">
+									<div class="slds-file-selector slds-file-selector--files">
+										<div class="slds-file-selector__dropzone">
+											<input type='file' class="file-upload" id="file-upload-input-01" />
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+				</div>
+	    		
+				<br />
+	    	</div> <!--/ form -->
+	    	
+	    	<div class="slds-section slds-is-open">
+			  	<div class="slds-section__title sectionTitle">Permission Set Assignment</div>
+			  	<br />
+			  	<div aria-hidden="false" class="slds-section__content slds-m-left--medium" id="expando-unique-id">
+			    	<table>
+			    		<tr>
+			    			<th>Available Permission Sets</th>
+			    			<th>Selected Permission Sets</th>
+			    		</tr>
+			    		<tr>
+			    			<td>
+			    				<div class="box source" id="source" dropzone="move">
+									<input type="text" id="inputSearch" placeholder="Search a permission set" autocomplete="off" text-indent="10px" />
+								</div>
+			    			</td>
+			    			<td>
+			    				<div class="box" id="target" dropzone="move"></div>
+			    			</td>
+			    		</tr>
+			    	</table>
+			  	</div>
+			</div>
+
+			<br />
+			<div class="slds-section slds-is-open">
+			  	<div class="slds-section__title sectionTitle">License Assignment</div>
+			  		<br />
+				  	<div aria-hidden="false" class="slds-section__content slds-m-left--medium" id="expando-unique-id">
+
+				  	<table>
+			    		<tr>
+			    			<th>Available Package Licenses</th>
+			    			<th>Selected Package Licenses</th>
+			    		</tr>
+			    		<tr>
+			    			<td>
+			    				<div class="box source" id="source2" dropzone="move">
+									<input type="text" id="inputSearch2" placeholder="Search a license" autocomplete="off" text-indent="10px" />
+								</div>
+			    			</td>
+			    			<td>
+			    				<div class="box" id="target2" dropzone="move"></div>
+			    			</td>
+			    		</tr>
+			    	</table>
+				</div>
+			</div>
+			
+			<br />
+			<div class="slds-section slds-is-open">
+			  	<div class="slds-section__title sectionTitle">User Flags</div>
+			  		<br />
+				  	<div aria-hidden="false" class="slds-section__content slds-m-left--medium" id="expando-unique-id">
+
+				  	<apex:repeat value="{!userFlags}" var="item">
+						<div class="demo-only slds-size_1-of-2">
+							<div class="slds-form-element">
+								<label class="slds-checkbox_toggle slds-grid" style="width: 50em">
+									  
+									  <input type="checkbox" class="flag" name="checkbox" aria-describedby="toggle-desc" data-name="{!item.Name}" />
+									  <span id="toggle-desc" class="slds-checkbox_faux_container" aria-live="assertive" style="right: -30em; position: relative;">
+										    <span class="slds-checkbox_faux"></span>
+										    <span class="slds-checkbox_on">Enabled</span>
+										    <span class="slds-checkbox_off">Disabled</span>
+									  </span>
+									  <span class="slds-form-element__label slds-m-bottom_none">{! item.Label}</span>
+								</label>
+							</div>
+							<br />
+						</div>
+					</apex:repeat>
+				</div>
+			</div>
+
+	    	<div class="slds-grid slds-grid--align-center slds-m-top--medium">
+	    		<apex:commandButton onclick="processSelections(); " value="Submit" styleClass="slds-button slds-button--brand slds-m-top--medium"/>
+	    	</div>
+	    </apex:form>
+    </div>
+    <!-- / PRIMARY CONTENT WRAPPER -->    
+
+  </div>
+  <!-- / REQUIRED SLDS WRAPPER -->    
+
+</body>
+</html>
+</apex:page>
